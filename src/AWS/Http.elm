@@ -69,12 +69,12 @@ import Time exposing (Posix)
 
 {-| Signs and sends a `Request` to a `Service`.
 -}
-send :
-    Service
-    -> Credentials
-    -> Request err a
-    -> Task.Task (Error err) a
-send service credentials req =
+-- send :
+--     Service
+--     -> Credentials
+--     -> Request err a
+--     -> Task.Task (Error err) a
+send service credentials req resolver =
     let
         prepareRequest : Request err a -> Request err a
         prepareRequest innerReq =
@@ -87,11 +87,11 @@ send service credentials req =
                 _ ->
                     innerReq
 
-        signWithTimestamp : Request err a -> Posix -> Task (Error.Error err) a
+        --signWithTimestamp : Request err a -> Posix -> Task (Error.Error err) a
         signWithTimestamp innerReq posix =
             case service.signer of
                 SignV4 ->
-                    V4.sign service credentials posix innerReq
+                    V4.sign service credentials posix innerReq resolver
 
                 SignS3 ->
                     Task.fail (Http.BadBody "TODO: S3 Signing Scheme not implemented." |> Error.HttpError)

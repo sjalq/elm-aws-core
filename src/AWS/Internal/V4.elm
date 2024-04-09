@@ -13,6 +13,7 @@ import AWS.Internal.Error as Error
 import AWS.Internal.Request exposing (Request, ResponseDecoder)
 import AWS.Internal.Service as Service exposing (Service)
 import AWS.Internal.UrlBuilder
+import Bytes exposing (Bytes)
 import Crypto.HMAC exposing (sha256)
 import Http
 import Iso8601
@@ -31,9 +32,11 @@ sign :
     -> Credentials
     -> Posix
     -> Request err a
-    -> Task (Error.Error err) a
-sign service creds date req =
+    -> Http.Resolver x a 
+    -> Task x a
+sign service creds date req resolver =
     let
+        -- responseDecoder : Http.Response String -> Result (Error.Error err) a
         responseDecoder response =
             case response of
                 Http.BadUrl_ url ->
@@ -56,7 +59,6 @@ sign service creds date req =
                         Ok appErr ->
                             Error.AWSError appErr
                                 |> Err
-
                         Err err ->
                             Http.BadBody err
                                 |> Error.HttpError
@@ -72,8 +74,29 @@ sign service creds date req =
                                 |> Error.HttpError
                                 |> Err
 
-        resolver =
+        resolver__ =
             Http.stringResolver responseDecoder
+
+        -- decodeBytesResponse : Http.Response x -> Result (Error.Error err) a
+        decodeBytesResponse map response  =
+            case response of
+                Http.GoodStatus_ _ res ->
+                    Ok (map res)
+
+                Http.BadStatus_ metadata _ ->
+                    Http.BadStatus metadata.statusCode |> Error.HttpError |> Err
+
+                Http.Timeout_ ->
+                    Http.Timeout |> Error.HttpError |> Err
+
+                Http.NetworkError_ ->
+                    Http.NetworkError |> Error.HttpError |> Err
+
+                Http.BadUrl_ metadata ->
+                    Http.BadUrl metadata |> Error.HttpError |> Err
+
+        resolver_ =
+            Http.bytesResolver (decodeBytesResponse identity)
     in
     Http.task
         { method = req.method
@@ -209,7 +232,9 @@ credentialScope : Posix -> Credentials -> Service -> String
 credentialScope date creds service =
     [ date |> formatPosix |> String.slice 0 8
     , Service.region service
-    , service.endpointPrefix
+
+    --, service.endpointPrefix
+    , "s3"
     , "aws4_request"
     ]
         |> String.join "/"
@@ -229,7 +254,8 @@ signature creds service date toSign =
         |> Bytes.fromUTF8
         |> digest (formatPosix date |> String.slice 0 8)
         |> digest (Service.region service)
-        |> digest service.endpointPrefix
+        |> digest "s3"
+        --service.endpointPrefix
         |> digest "aws4_request"
         |> digest toSign
         |> Hex.fromByteList
