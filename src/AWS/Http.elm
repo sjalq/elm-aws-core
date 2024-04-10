@@ -74,7 +74,7 @@ import Time exposing (Posix)
 --     -> Credentials
 --     -> Request err a
 --     -> Task.Task (Error err) a
-send service credentials req resolver =
+send service credentials req =
     let
         prepareRequest : Request err a -> Request err a
         prepareRequest innerReq =
@@ -91,7 +91,7 @@ send service credentials req resolver =
         signWithTimestamp innerReq posix =
             case service.signer of
                 SignV4 ->
-                    V4.sign service credentials posix innerReq resolver
+                    V4.sign service credentials posix innerReq
 
                 SignS3 ->
                     Task.fail (Http.BadBody "TODO: S3 Signing Scheme not implemented." |> Error.HttpError)

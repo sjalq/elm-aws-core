@@ -27,14 +27,14 @@ import Word.Hex as Hex
 
 {-| Prepares a request and signs it with the V4 signing scheme.
 -}
-sign :
-    Service
-    -> Credentials
-    -> Posix
-    -> Request err a
-    -> Http.Resolver x a 
-    -> Task x a
-sign service creds date req resolver =
+-- sign :
+--     Service
+--     -> Credentials
+--     -> Posix
+--     -> Request err a
+--     -> Http.Resolver x a 
+--     -> Task x a
+sign service creds date req  =
     let
         -- responseDecoder : Http.Response String -> Result (Error.Error err) a
         responseDecoder response =
@@ -107,7 +107,7 @@ sign service creds date req resolver =
                 |> List.map (\( key, val ) -> Http.header key val)
         , url = AWS.Internal.UrlBuilder.url service req
         , body = AWS.Internal.Body.toHttp req.body
-        , resolver = resolver
+        , resolver = resolver_
         , timeout = Nothing
         }
 
