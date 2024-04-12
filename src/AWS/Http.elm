@@ -1,5 +1,6 @@
 module AWS.Http exposing
     ( send, sendUnsigned
+    , sendGetBytes
     , Method(..), Path, Request
     , request
     , Body, MimeType
@@ -74,6 +75,32 @@ import Time exposing (Posix)
 --     -> Credentials
 --     -> Request err a
 --     -> Task.Task (Error err) a
+sendGetBytes service credentials req =
+    let
+        prepareRequest : Request err a -> Request err a
+        prepareRequest innerReq =
+            case service.protocol of
+                JSON ->
+                    addHeaders
+                        [ ( "x-amz-target", service.targetPrefix ++ "." ++ innerReq.name ) ]
+                        innerReq
+
+                _ ->
+                    innerReq
+
+        --signWithTimestamp : Request err a -> Posix -> Task (Error.Error err) a
+        signWithTimestamp innerReq posix =
+            case service.signer of
+                SignV4 ->
+                    V4.signGetBytes service credentials posix innerReq
+
+                SignS3 ->
+                    Task.fail (Http.BadBody "TODO: S3 Signing Scheme not implemented." |> Error.HttpError)
+    in
+    Time.now
+        |> Task.andThen (prepareRequest req |> signWithTimestamp)
+        |> Task.mapError internalErrToErr
+
 send service credentials req =
     let
         prepareRequest : Request err a -> Request err a

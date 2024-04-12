@@ -1,4 +1,7 @@
-module AWS.Internal.V4 exposing (sign)
+module AWS.Internal.V4 exposing
+    ( sign
+    , signGetBytes
+    )
 
 {-| V4 request signing implementation.
 
@@ -27,14 +30,7 @@ import Word.Hex as Hex
 
 {-| Prepares a request and signs it with the V4 signing scheme.
 -}
--- sign :
---     Service
---     -> Credentials
---     -> Posix
---     -> Request err a
---     -> Http.Resolver x a 
---     -> Task x a
-sign service creds date req  =
+signGetBytes service creds date req =
     let
         -- responseDecoder : Http.Response String -> Result (Error.Error err) a
         responseDecoder response =
@@ -59,6 +55,7 @@ sign service creds date req  =
                         Ok appErr ->
                             Error.AWSError appErr
                                 |> Err
+
                         Err err ->
                             Http.BadBody err
                                 |> Error.HttpError
@@ -78,7 +75,7 @@ sign service creds date req  =
             Http.stringResolver responseDecoder
 
         -- decodeBytesResponse : Http.Response x -> Result (Error.Error err) a
-        decodeBytesResponse map response  =
+        decodeBytesResponse map response =
             case response of
                 Http.GoodStatus_ _ res ->
                     Ok (map res)
@@ -108,6 +105,69 @@ sign service creds date req  =
         , url = AWS.Internal.UrlBuilder.url service req
         , body = AWS.Internal.Body.toHttp req.body
         , resolver = resolver_
+        , timeout = Nothing
+        }
+
+
+sign :
+    Service
+    -> Credentials
+    -> Posix
+    -> Request err a
+    -> Task (Error.Error err) a
+sign service creds date req =
+    let
+        responseDecoder response =
+            case response of
+                Http.BadUrl_ url ->
+                    Http.BadUrl url
+                        |> Error.HttpError
+                        |> Err
+
+                Http.Timeout_ ->
+                    Http.Timeout
+                        |> Error.HttpError
+                        |> Err
+
+                Http.NetworkError_ ->
+                    Http.NetworkError
+                        |> Error.HttpError
+                        |> Err
+
+                Http.BadStatus_ metadata body ->
+                    case req.errorDecoder metadata body of
+                        Ok appErr ->
+                            Error.AWSError appErr
+                                |> Err
+
+                        Err err ->
+                            Http.BadBody err
+                                |> Error.HttpError
+                                |> Err
+
+                Http.GoodStatus_ metadata body ->
+                    case req.decoder metadata body of
+                        Ok resp ->
+                            Ok resp
+
+                        Err err ->
+                            Http.BadBody err
+                                |> Error.HttpError
+                                |> Err
+
+        resolver =
+            Http.stringResolver responseDecoder
+    in
+    Http.task
+        { method = req.method
+        , headers =
+            headers service date req.body req.headers
+                |> addAuthorization service creds date req
+                |> addSessionToken creds
+                |> List.map (\( key, val ) -> Http.header key val)
+        , url = AWS.Internal.UrlBuilder.url service req
+        , body = AWS.Internal.Body.toHttp req.body
+        , resolver = resolver
         , timeout = Nothing
         }
 
