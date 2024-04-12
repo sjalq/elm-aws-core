@@ -1,21 +1,23 @@
 module AWS.Internal.Body exposing
-    ( Body
+    ( Body(..)
     , empty
     , explicitMimetype
     , json
     , string
+    , bytes
     , toHttp
     , toString
     )
 
 import Http
 import Json.Encode
-
+import Bytes exposing (Bytes)
 
 type Body
     = Empty
     | Json Json.Encode.Value
     | String String String
+    | Bytes String Bytes
 
 
 toHttp : Body -> Http.Body
@@ -29,6 +31,9 @@ toHttp body =
 
         String mimetype val ->
             Http.stringBody mimetype val
+
+        Bytes mimetype val ->
+            Http.bytesBody mimetype val
 
 
 explicitMimetype : Body -> Maybe String
@@ -53,6 +58,9 @@ toString body =
         String _ val ->
             val
 
+        Bytes _ _ ->
+            "Bytes"
+
 
 empty : Body
 empty =
@@ -67,3 +75,7 @@ json =
 string : String -> String -> Body
 string =
     String
+
+bytes : String -> Bytes -> Body
+bytes =
+    Bytes

@@ -6,7 +6,8 @@ import AWS.Internal.Service as Service exposing (Service)
 import AWS.Uri
 import Crypto.Hash exposing (sha256)
 import Regex
-
+import SHA256
+import AWS.Internal.Body as Body
 
 
 -- http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
@@ -90,8 +91,13 @@ signedHeaders headers =
 
 
 canonicalPayload : Body -> String
-canonicalPayload =
-    AWS.Internal.Body.toString >> sha256
+canonicalPayload body =
+    case body of
+        Body.Bytes _ payload ->
+            payload |> SHA256.fromBytes |> SHA256.toHex
+
+        _ ->
+            body |> AWS.Internal.Body.toString |> sha256
 
 
 
